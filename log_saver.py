@@ -2,6 +2,9 @@ import serial
 import serial.tools.list_ports
 from datetime import datetime
 import time
+import threading
+import tkinter as tk
+from tkinter import scrolledtext
 
 def find_arduino_port():
     """Tenta encontrar a porta serial do Arduino automaticamente."""
@@ -11,23 +14,25 @@ def find_arduino_port():
             return p.device
     return None
 
-def main():
-    """Lê os dados do Arduino e salva em um arquivo de log."""
+def update_gui(log_text_widget, log_entry):
+    log_text_widget.config(state=tk.NORMAL)
+    log_text_widget.insert(tk.END, log_entry)
+    log_text_widget.see(tk.END)
+    log_text_widget.config(state=tk.DISABLED)
+
+def serial_thread(log_text_widget):
     port = find_arduino_port()
     if not port:
-        print("Arduino nao encontrado. Por favor, especifique a porta serial manualmente.")
-        # Exemplo para Windows: port = 'COM3'
-        # Exemplo para macOS/Linux: port = '/dev/tty.usbmodem14201'
+        log_entry = "Arduino nao encontrado. Por favor, especifique a porta serial manualmente.\n"
+        update_gui(log_text_widget, log_entry)
         return
-
     ser = None
     try:
         ser = serial.Serial(port, 9600, timeout=1)
-        print(f"Conectado ao Arduino na porta: {port}")
-        time.sleep(2) # Espera a conexao ser estabelecida
-
+        update_gui(log_text_widget, f"Conectado ao Arduino na porta: {port}\n")
+        time.sleep(2)
         with open("log_acesso.txt", "a") as log_file:
-            print("Escutando dados do Arduino...")
+            update_gui(log_text_widget, "Escutando dados do Arduino...\n")
             while True:
                 line = ser.readline().decode('utf-8').strip()
                 if line.startswith("LOG,"):
@@ -36,21 +41,27 @@ def main():
                     owner = parts[2]
                     status = parts[3]
                     timestamp = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-
                     log_entry = f"{timestamp} - UID: {uid}, Dono: {owner}, Status: {status}\n"
-                    
-                    print(log_entry.strip())
+                    update_gui(log_text_widget, log_entry)
                     log_file.write(log_entry)
-                    log_file.flush() # Salva a linha imediatamente no arquivo
-
+                    log_file.flush()
     except serial.SerialException as e:
-        print(f"Erro de porta serial: {e}")
-    except KeyboardInterrupt:
-        print("\nPrograma encerrado pelo usuario.")
+        update_gui(log_text_widget, f"Erro de porta serial: {e}\n")
+    except Exception as e:
+        update_gui(log_text_widget, f"Erro: {e}\n")
     finally:
         if ser and ser.is_open:
             ser.close()
-            print("Porta serial fechada.")
+            update_gui(log_text_widget, "Porta serial fechada.\n")
+
+def main():
+    root = tk.Tk()
+    root.title("Log de Acesso RFID - Arduino")
+    log_text = scrolledtext.ScrolledText(root, width=80, height=20, state=tk.DISABLED, font=("Consolas", 10))
+    log_text.pack(padx=10, pady=10)
+    t = threading.Thread(target=serial_thread, args=(log_text,), daemon=True)
+    t.start()
+    root.mainloop()
 
 if __name__ == "__main__":
     main()
