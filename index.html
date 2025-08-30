@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visualizador de Log</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+        .log-entry-granted {
+            border-left-color: #10B981; /* green-500 */
+        }
+        .log-entry-denied {
+            border-left-color: #EF4444; /* red-500 */
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center min-h-screen p-4 sm:p-6 bg-gray-100">
+
+    <div class="w-full max-w-2xl bg-white shadow-xl rounded-2xl p-6 sm:p-8 mb-6">
+        <h1 class="text-3xl font-bold text-center text-gray-800 mb-2">Visualizador de Log</h1>
+        <p class="text-sm text-center text-gray-500 mb-6">Selecione o arquivo log_acesso.txt para visualizar o histórico de acesso.</p>
+
+        <!-- Container para a seleção de arquivo e o botão de reset -->
+        <div id="fileInputContainer" class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-4">
+            <input type="file" id="logFileInput" accept=".txt" class="p-2 border border-gray-300 rounded-lg">
+            <button id="resetButton" class="hidden px-4 py-2 bg-gray-200 text-gray-800 font-medium rounded-lg shadow hover:bg-gray-300 transition-colors">
+                Carregar Novo Arquivo
+            </button>
+        </div>
+        
+        <!-- Mensagem de status -->
+        <div id="statusMessage" class="text-center p-3 rounded-lg text-gray-700"></div>
+    </div>
+
+    <div class="w-full max-w-2xl bg-white shadow-xl rounded-2xl p-6 sm:p-8">
+        <h2 class="text-2xl font-bold text-gray-800 mb-4 text-center">Histórico de Acesso</h2>
+        <div id="logContainer" class="space-y-4">
+            <!-- As entradas do log serao adicionadas aqui dinamicamente -->
+            <p class="text-center text-gray-500">Selecione um arquivo de log para começar.</p>
+        </div>
+    </div>
+
+    <script>
+        const logFileInput = document.getElementById('logFileInput');
+        const logContainer = document.getElementById('logContainer');
+        const statusMessage = document.getElementById('statusMessage');
+        const fileInputContainer = document.getElementById('fileInputContainer');
+        const resetButton = document.getElementById('resetButton');
+
+        // Escuta quando o usuário seleciona um arquivo
+        logFileInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (!file) {
+                return;
+            }
+
+            const reader = new FileReader();
+
+            // Quando o arquivo é lido, esta função é executada
+            reader.onload = (e) => {
+                const logContent = e.target.result;
+                processLogFile(logContent);
+                // Esconde o input de arquivo e mostra o botão de reset
+                logFileInput.classList.add('hidden');
+                resetButton.classList.remove('hidden');
+            };
+
+            // Lê o conteúdo do arquivo como texto
+            reader.readAsText(file);
+        });
+
+        // Escuta o clique no botão de reset para recarregar a página
+        resetButton.addEventListener('click', () => {
+            window.location.reload();
+        });
+
+        function processLogFile(content) {
+            logContainer.innerHTML = '';
+            statusMessage.textContent = '';
+            const lines = content.split('\n').filter(line => line.trim() !== '');
+
+            if (lines.length === 0) {
+                statusMessage.textContent = 'O arquivo de log está vazio ou não pôde ser lido.';
+                return;
+            }
+
+            lines.forEach(line => {
+                // Formato esperado da linha: "03/10/2024 17:42:52 - UID: 0A C6 3A 03, Dono: Joao, Status: Acesso Concedido"
+                const match = line.match(/(.*) - UID: (.*), Dono: (.*), Status: (.*)/);
+
+                if (match) {
+                    const [, timestamp, uid, owner, status] = match;
+                    createLogCard({ uid, owner, status, timestamp });
+                }
+            });
+            
+            statusMessage.textContent = `Foram lidas ${lines.length} entradas de log.`;
+        }
+
+        function createLogCard(log) {
+            const card = document.createElement('div');
+            const isGranted = log.status.includes('Concedido');
+            const statusClass = isGranted ? 'bg-green-100 log-entry-granted' : 'bg-red-100 log-entry-denied';
+            
+            card.className = `bg-white p-4 rounded-xl border-l-4 shadow-sm transition-transform transform hover:scale-[1.01] ${statusClass}`;
+            card.innerHTML = `
+                <p class="font-bold text-gray-800">${log.owner || "Desconhecido"}</p>
+                <p class="text-sm text-gray-600">UID: ${log.uid}</p>
+                <p class="text-sm text-gray-600">Status: <span class="font-bold">${log.status}</span></p>
+                <p class="text-xs text-gray-500 mt-1">${log.timestamp}</p>
+            `;
+            logContainer.appendChild(card);
+        }
+
+    </script>
+</body>
+</html>
